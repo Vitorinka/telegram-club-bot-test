@@ -14,6 +14,12 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiohttp import web
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+@dp.message_handler(content_types=['photo'])
+async def get_photo_id(message: types.Message):
+    file_id = message.photo[-1].file_id
+    logging.info(f"Получен file_id: {file_id}")
+    await message.reply(f"file_id: {file_id}")
+
 # --- НАСТРОЙКИ ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logging.info("Начинаю подключение к базе данных...")
