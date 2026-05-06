@@ -14,12 +14,6 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiohttp import web
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-@dp.message_handler(content_types=['photo'])
-async def get_photo_id(message: types.Message):
-    file_id = message.photo[-1].file_id
-    logging.info(f"Получен file_id: {file_id}")
-    await message.reply(f"file_id: {file_id}")
-
 # --- НАСТРОЙКИ ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logging.info("Начинаю подключение к базе данных...")
@@ -32,8 +26,8 @@ stripe.api_key = os.getenv("STRIPE_API_KEY")
 if not DATABASE_URL:
     raise ValueError("Критическая ошибка: DATABASE_URL не задан!")
 
-PHOTO_URL_INTRO = "AgACAgIAAxkBAAMPaee4TD_FGuIQ4LProdOdL5XV5EkAAiYRaxulqkBL5YKQtOj0fV4BAAMCAAN5AAM7BA"
-PHOTO_URL_RULES = "AgACAgIAAxkBAAMSaee9wO7psIiqhOR3M52AQ_aRwPgAAjgRaxulqkBLRv00tJs-NW8BAAMCAAN5AAM7BA"
+PHOTO_URL_INTRO = ""
+PHOTO_URL_RULES = ""
 
 bot = Bot(token=BOT_TOKEN)
 storage = MemoryStorage()
