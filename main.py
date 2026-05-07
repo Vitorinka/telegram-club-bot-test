@@ -13,6 +13,9 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiohttp import web
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+class PromoStates(StatesGroup):
+    waiting_for_media = State()   # ждём фото или видео
+    waiting_for_text = State()    # ждём текст (можно объединить, но так проще)
 
 # --- НАСТРОЙКИ ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -81,6 +84,87 @@ def init_db():
     cur.close()
     conn.close()
     logging.info("--- БД ИНИЦИАЛИЗИРОВАНА И ПРОВЕРЕНА ---")
+
+@dp.message_handler(commands=['promo_trial'])
+async def promo_trial(message: types.Message):
+    if message.from_user.id not in ADMIN_IDS:
+        return
+    await PromoStates.waiting_for_media.set()
+    await message.reply("📎 Отправьте фото или видео, которое будет в рассылке.\n\n"
+                        "Чтобы отменить, отправьте /cancel")
+
+@dp.message_handler(content_types=['photo', 'video'], state=PromoStates.waiting_for_media)
+async def promo_get_media(message: types.Message, state: FSMContext):
+    if message.photo:
+        file_id = message.photo[-1].file_id
+        media_type = 'photo'
+    else:
+        file_id = message.video.file_id
+        media_type = 'video'
+    await state.update_data(media_type=media_type, file_id=file_id)
+    await PromoStates.waiting_for_text.set()
+    await message.reply("✏️ Теперь отправьте текст сообщения.\n\n"
+                        "Можно использовать HTML-разметку (<b>жирный</b>, <i>курсив</i>).")
+
+@dp.message_handler(state=PromoStates.waiting_for_text, content_types=types.ContentTypes.TEXT)
+async def promo_get_text(message: types.Message, state: FSMContext):
+    text = message.html_text
+    data = await state.get_data()
+    media_type = data['media_type']
+    file_id = data['file_id']
+
+    # Подтверждение перед отправкой
+    kb = InlineKeyboardMarkup(row_width=2).add(
+        InlineKeyboardButton("✅ Да, отправить", callback_data="confirm_promo"),
+        InlineKeyboardButton("❌ Отмена", callback_data="cancel_promo")
+    )
+    await state.update_data(text=text)
+    # Отправим админу предпросмотр
+    if media_type == 'photo':
+        await message.reply_photo(file_id, caption=text + "\n\n---\n<i>Предпросмотр. Отправляем?</i>", reply_markup=kb, parse_mode="HTML")
+    else:
+        await message.reply_video(file_id, caption=text + "\n\n---\n<i>Предпросмотр. Отправляем?</i>", reply_markup=kb, parse_mode="HTML")
+
+@dp.callback_query_handler(text="confirm_promo", state=PromoStates.waiting_for_text)
+async def promo_send(callback: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    text = data['text']
+    media_type = data['media_type']
+    file_id = data['file_id']
+
+    conn = get_db_conn()
+    cur = conn.cursor()
+    # Выбираем пользователей, у которых нет активной подписки (paid = FALSE)
+    cur.execute("SELECT telegram_id FROM users WHERE paid = FALSE")
+    users = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    kb = InlineKeyboardMarkup().add(InlineKeyboardButton("🌟 Попробовать пробную неделю", callback_data="sub_trial"))
+
+    success = 0
+    blocked = 0
+    for (user_id,) in users:
+        try:
+            if media_type == 'photo':
+                await bot.send_photo(user_id, file_id, caption=text, reply_markup=kb, parse_mode="HTML")
+            else:
+                await bot.send_video(user_id, file_id, caption=text, reply_markup=kb, parse_mode="HTML")
+            success += 1
+        except BotBlocked:
+            blocked += 1
+        except Exception as e:
+            logging.error(f"Ошибка отправки {user_id}: {e}")
+
+    await callback.message.edit_text(f"✅ Рассылка завершена.\n📨 Успешно: {success}\n🚫 Заблокировали: {blocked}")
+    await state.finish()
+    await callback.answer()
+
+@dp.callback_query_handler(text="cancel_promo", state=PromoStates.waiting_for_text)
+async def promo_cancel(callback: types.CallbackQuery, state: FSMContext):
+    await callback.message.edit_text("❌ Рассылка отменена.")
+    await state.finish()
+    await callback.answer()
 
 @dp.message_handler(content_types=['photo'])
 async def reply_with_file_id(message: types.Message):
