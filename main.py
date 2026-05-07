@@ -83,6 +83,11 @@ def init_db():
     conn.close()
     logging.info("--- БД ИНИЦИАЛИЗИРОВАНА И ПРОВЕРЕНА ---")
 
+@dp.message_handler(content_types=['photo'])
+async def reply_with_file_id(message: types.Message):
+    file_id = message.photo[-1].file_id
+    await message.reply(f"Ваш file_id:\n`{file_id}`", parse_mode="Markdown")
+
 # Идемпотентность вебхуков
 async def is_event_processed(event_id):
     conn = get_db_conn()
