@@ -134,7 +134,6 @@ async def promo_send(callback: types.CallbackQuery, state: FSMContext):
 
     conn = get_db_conn()
     cur = conn.cursor()
-    # Выбираем пользователей, у которых нет активной подписки (paid = FALSE)
     cur.execute("SELECT telegram_id FROM users WHERE paid = FALSE")
     users = cur.fetchall()
     cur.close()
@@ -156,7 +155,8 @@ async def promo_send(callback: types.CallbackQuery, state: FSMContext):
         except Exception as e:
             logging.error(f"Ошибка отправки {user_id}: {e}")
 
-    await callback.message.edit_text(f"✅ Рассылка завершена.\n📨 Успешно: {success}\n🚫 Заблокировали: {blocked}")
+    # Вместо редактирования исходного сообщения (которое может быть медиа) — шлём новое сообщение админу с результатом
+    await callback.message.answer(f"✅ Рассылка завершена.\n📨 Успешно: {success}\n🚫 Заблокировали: {blocked}")
     await state.finish()
     await callback.answer()
 
