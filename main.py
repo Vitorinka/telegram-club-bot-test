@@ -87,7 +87,7 @@ def init_db():
 
 @dp.message_handler(commands=['promo_trial'])
 async def promo_trial(message: types.Message):
-    if message.from_user.id not in ADMINS_IDS:
+    if message.from_user.id not in ADMIN_IDS:
         return
     await PromoStates.waiting_for_media.set()
     await message.reply("📎 Отправьте фото или видео, которое будет в рассылке.\n\n"
@@ -210,7 +210,7 @@ def get_tariffs_keyboard(show_trial=True):
     return kb
 
 async def notify_admins(text: str):
-    for admin_id in ADMINS_IDS:
+    for admin_id in ADMIN_IDS:
         try:
             await bot.send_message(admin_id, f"⚠️ {text}")
         except Exception:
