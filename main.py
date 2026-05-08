@@ -87,7 +87,9 @@ def init_db():
 
 @dp.message_handler(commands=['promo_trial'])
 async def promo_trial(message: types.Message):
+    logging.info(f"Команда promo_trial от {message.from_user.id}")
     if message.from_user.id not in ADMIN_IDS:
+        logging.warning(f"Отказано {message.from_user.id}, ADMIN_IDS={ADMIN_IDS}")
         return
     await PromoStates.waiting_for_media.set()
     await message.reply("📎 Отправьте фото или видео, которое будет в рассылке.\n\n"
