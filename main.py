@@ -85,15 +85,25 @@ def init_db():
     conn.close()
     logging.info("--- БД ИНИЦИАЛИЗИРОВАНА И ПРОВЕРЕНА ---")
 
-@dp.message_handler(commands=['promo_trial'])
-async def promo_trial(message: types.Message):
+@dp.message_handler(commands=['promo_trial'], state='*')
+async def promo_trial(message: types.Message, state: FSMContext):
+    await state.finish()   # <--- сбросить любое зависшее состояние
     logging.info(f"Команда promo_trial от {message.from_user.id}")
     if message.from_user.id not in ADMIN_IDS:
-        logging.warning(f"Отказано {message.from_user.id}, ADMIN_IDS={ADMIN_IDS}")
+        logging.warning(f"Отказано {message.from_user.id}")
         return
     await PromoStates.waiting_for_media.set()
     await message.reply("📎 Отправьте фото или видео, которое будет в рассылке.\n\n"
                         "Чтобы отменить, отправьте /cancel")
+
+@dp.message_handler(commands=['cancel'], state='*')
+async def cancel_handler(message: types.Message, state: FSMContext):
+    current_state = await state.get_state()
+    if current_state is None:
+        await message.reply("Нет активного действия для отмены.")
+        return
+    await state.finish()
+    await message.reply("✅ Действие отменено. Можете начать заново.")
 
 @dp.message_handler(content_types=['photo', 'video'], state=PromoStates.waiting_for_media)
 async def promo_get_media(message: types.Message, state: FSMContext):
