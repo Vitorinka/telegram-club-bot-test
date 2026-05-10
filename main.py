@@ -151,7 +151,7 @@ async def promo_send(callback: types.CallbackQuery, state: FSMContext):
     cur.close()
     conn.close()
 
-    kb = InlineKeyboardMarkup().add(InlineKeyboardButton("🌟 Попробовать пробную неделю", callback_data="sub_trial"))
+    kb = InlineKeyboardMarkup().add(InlineKeyboardButton("Начать пробную неделю", callback_data="sub_trial"))
 
     success = 0
     blocked = 0
