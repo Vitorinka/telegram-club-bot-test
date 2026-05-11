@@ -400,22 +400,44 @@ async def show_choice(callback: types.CallbackQuery, state: FSMContext):
 
 @dp.callback_query_handler(lambda c: c.data.startswith('sub_'), state='*')
 async def process_payment(callback: types.CallbackQuery, state: FSMContext):
-    await callback.answer("⏳ Перенаправляем на оплату...")
+    await callback.answer("⏳ Проверяем...")
     sub_type = callback.data
     user_id = callback.from_user.id
 
-    # Защита от повторного триала
-    if sub_type == "sub_trial":
-        conn = get_db_conn()
-        cur = conn.cursor()
-        cur.execute("SELECT trial_used FROM users WHERE telegram_id = %s", (user_id,))
-        row = cur.fetchone()
-        cur.close()
-        conn.close()
-        if row and row[0] is True:
-            await callback.answer("⚠️ Вы уже использовали пробную неделю.", show_alert=True)
-            return
+    # Получаем данные пользователя из БД
+    conn = get_db_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT trial_used, paid FROM users WHERE telegram_id = %s", (user_id,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
 
+    trial_used = row[0] if row else False
+    paid = row[1] if row else False
+
+    # Если нажата кнопка пробной недели
+    if sub_type == "sub_trial":
+        # Если пробный период уже использован ИЛИ у пользователя есть активная подписка
+        if trial_used or paid:
+            # Показываем клавиатуру с обычными тарифами (без пробного)
+            kb = get_tariffs_keyboard(show_trial=False)
+            text = "Вы уже использовали пробную неделю (или у вас активна подписка). Выберите платный тариф:"
+            # Если сообщение имеет caption/текст, отредактируем, иначе отправим новое
+            try:
+                if callback.message.caption is not None:
+                    await callback.message.edit_caption(caption=text, reply_markup=kb, parse_mode="HTML")
+                elif callback.message.text:
+                    await callback.message.edit_text(text=text, reply_markup=kb, parse_mode="HTML")
+                else:
+                    await callback.message.reply(text, reply_markup=kb, parse_mode="HTML")
+            except Exception:
+                await callback.message.reply(text, reply_markup=kb, parse_mode="HTML")
+            return  # не создаём Stripe сессию
+
+        # Иначе (пробный период не использован) – продолжаем создание оплаты пробной недели
+        # (весь код ниже для sub_trial, но он такой же, как для остальных тарифов, поэтому вынесем общую логику)
+
+    # Обработка всех тарифов (включая sub_trial, если прошли проверку)
     price_map = {
         "sub_trial": "PRICE_TRIAL",
         "sub_1": "PRICE_1M",
@@ -447,21 +469,12 @@ async def process_payment(callback: types.CallbackQuery, state: FSMContext):
             client_reference_id=str(user_id),
             metadata={'days': str(days)}
         )
-        kb = InlineKeyboardMarkup(row_width=1).add(
+        new_kb = InlineKeyboardMarkup(row_width=1).add(
             InlineKeyboardButton("💳 Перейти к оплате", url=session.url),
             InlineKeyboardButton("🔙 Назад к тарифам", callback_data="back_to_tariffs")
         )
-        # --- Универсальное редактирование ---
-        if callback.message.photo:
-            await callback.message.edit_caption(
-                caption="✅ Вы выбрали тариф. Нажмите кнопку для оплаты:",
-                reply_markup=kb
-            )
-        else:
-            await callback.message.edit_text(
-                text="✅ Вы выбрали тариф. Нажмите кнопку для оплаты:",
-                reply_markup=kb
-            )
+        # Меняем клавиатуру исходного сообщения (безопасно)
+        await callback.message.edit_reply_markup(reply_markup=new_kb)
         await state.finish()
     except Exception as e:
         logging.error(f"Stripe ошибка: {e}")
