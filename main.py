@@ -282,7 +282,7 @@ async def send_db_backup():
     db_url = os.getenv("DATABASE_URL")
     try:
         # Добавляем --no-version-check для совместимости версий
-        dump_cmd = f"pg_dump '{db_url}' --no-owner --no-privileges --no-version-check > {filename}"
+        dump_cmd = f"pg_dump '{db_url}' --no-owner --no-privileges"
         process = await asyncio.create_subprocess_shell(dump_cmd, shell=True)
         await process.communicate()
         if process.returncode != 0:
