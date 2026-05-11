@@ -1,13 +1,15 @@
-# Используем официальный образ Python
 FROM python:3.11-slim
-
-# Устанавливаем системные зависимости для работы с Postgres
-RUN apt-get update && \
-    apt-get install -y postgresql-client && \
-    rm -rf /var/lib/apt/lists/*
 
 # Устанавливаем рабочую директорию
 WORKDIR /app
+
+# Установка клиента PostgreSQL 18
+RUN apt-get update && apt-get install -y wget gnupg lsb-release && \
+    wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/postgresql-archive-keyring.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/postgresql-archive-keyring.gpg] http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
+    apt-get update && \
+    apt-get install -y postgresql-client-18 && \
+    rm -rf /var/lib/apt/lists/*
 
 # Копируем файл зависимостей и устанавливаем их
 COPY requirements.txt .
