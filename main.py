@@ -29,8 +29,8 @@ stripe.api_key = os.getenv("STRIPE_API_KEY")
 if not DATABASE_URL:
     raise ValueError("Критическая ошибка: DATABASE_URL не задан!")
 
-PHOTO_URL_INTRO = "https://i.imgur.com/a/TnzeGgh.jpg"
-PHOTO_URL_RULES = "https://i.imgur.com/a/TnzeGgh.jpg"
+PHOTO_URL_INTRO = "https://i.imgur.com/TnzeGgh.jpg"
+PHOTO_URL_RULES = "https://i.imgur.com/TnzeGgh.jpg"
 bot = Bot(token=BOT_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
