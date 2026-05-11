@@ -487,11 +487,13 @@ async def back_to_tariffs(callback: types.CallbackQuery, state: FSMContext):
     await RegistrationStates.choice.set()
     conn = get_db_conn()
     cur = conn.cursor()
-    cur.execute("SELECT paid FROM users WHERE telegram_id = %s", (callback.from_user.id,))
-    user = cur.fetchone()
+    # Исправлено: получаем и paid, и trial_used
+    cur.execute("SELECT paid, trial_used FROM users WHERE telegram_id = %s", (callback.from_user.id,))
+    row = cur.fetchone()
     cur.close()
     conn.close()
-    show_trial = not (user and user[0])
+    # Показываем триал только если нет ни paid, ни trial_used
+    show_trial = not (row and (row[0] or row[1])) if row else True
     kb = get_tariffs_keyboard(show_trial=show_trial)
     text = "Выберите свой формат участия:"
     try:
