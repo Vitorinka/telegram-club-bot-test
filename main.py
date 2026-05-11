@@ -284,9 +284,10 @@ async def send_db_backup():
         await notify_admins("❌ Ошибка бэкапа: DATABASE_URL не задан!")
         return
 
+    # Добавляем sslmode=require для Railway
+    conn_string = db_url + "?sslmode=require"
+
     try:
-        # Добавляем sslmode=require (это важно для Railway)
-        conn_string = db_url + "?sslmode=require"
         process = await asyncio.create_subprocess_exec(
             'pg_dump', conn_string,
             '--no-owner', '--no-privileges',
@@ -297,11 +298,11 @@ async def send_db_backup():
 
         if process.returncode != 0:
             error_msg = stderr.decode('utf-8')
-            logging.error(f"pg_dump failed: {error_msg}")
-            await notify_admins(f"❌ Ошибка дампа базы данных. Код: {process.returncode}. Подробности в логах.")
+            logging.error(f"pg_dump failed (code {process.returncode}): {error_msg}")
+            await notify_admins(f"❌ Ошибка дампа БД. Код: {process.returncode}. Подробности в логах.")
             return
 
-        # Записываем вывод в файл
+        # Записываем дамп в файл
         with open(filename, 'wb') as f:
             f.write(stdout)
 
