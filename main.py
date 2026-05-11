@@ -420,6 +420,7 @@ async def process_payment(callback: types.CallbackQuery, state: FSMContext):
         # Если пробный период уже использован ИЛИ у пользователя есть активная подписка
         if trial_used or paid:
             # Показываем клавиатуру с обычными тарифами (без пробного)
+            await state.finish()
             kb = get_tariffs_keyboard(show_trial=False)
             text = "Вы уже использовали пробную неделю (или у вас активна подписка). Выберите платный тариф:"
             # Если сообщение имеет caption/текст, отредактируем, иначе отправим новое
