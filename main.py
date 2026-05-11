@@ -849,6 +849,15 @@ async def stripe_webhook(request):
 
     await mark_event_processed(event_id)
     return web.Response(status=200)
+
+@dp.message_handler(commands=['test_backup'])
+async def test_backup(message: types.Message):
+    if message.from_user.id not in ADMIN_IDS:
+        await message.answer("Нет прав.")
+        return
+    await message.answer("🔄 Запускаю бэкап...")
+    await send_db_backup()
+    await message.answer("✅ Бэкап завершён. Проверьте личные сообщения от бота (файл должен прийти админам).")
     
 # --- ЗАПУСК И ВЕБХУК TELEGRAM ---
 async def on_startup(app):
