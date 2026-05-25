@@ -224,6 +224,38 @@ async def check_followup():
         cur.close()
         conn.close()
 
+# Кнопка "Меню" – показывает главное меню (оно же)
+@dp.message_handler(text="Меню")
+async def menu_button_handler(message: types.Message):
+    await show_menu(message)
+
+# Кнопка "💬 Сообщение админу" – пересылает сообщение админу
+@dp.message_handler(text="💬 Сообщение админу")
+async def contact_admin(message: types.Message):
+    await message.answer(
+        "📝 Напишите ваше сообщение администратору ниже.\n\n"
+        "Мы ответим вам в ближайшее время."
+    )
+    # Включаем режим ожидания сообщения от пользователя
+    await ContactState.waiting_for_message.set()
+
+# Кнопка "👤 Профиль и подписка" – вызывает команду /profile
+@dp.message_handler(text="👤 Профиль и подписка")
+async def profile_button_handler(message: types.Message):
+    await profile(message)
+
+# Кнопка "🆘 Правила клуба" – показывает правила (как в show_rules)
+@dp.message_handler(text="🆘 Правила клуба")
+async def rules_button_handler(message: types.Message):
+    rules_text = """📜 <b>Правила клуба</b>
+
+1. Уважайте других участников.
+2. Без спама и рекламы.
+3. Тренируйтесь в удовольствие!
+
+Полные правила можно найти в /rules"""
+    await message.answer(rules_text, parse_mode="HTML")
+
 @dp.message_handler(content_types=['video'], state=None)
 async def reply_with_video_id(message: types.Message):
     file_id = message.video.file_id
