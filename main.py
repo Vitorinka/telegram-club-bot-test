@@ -147,11 +147,10 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 def get_main_keyboard():
     kb = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     kb.add(
-        KeyboardButton("Меню"),
         KeyboardButton("🎁 Бесплатный урок")
     )
     kb.add(
-        KeyboardButton("💬 Сообщение админу"),
+        KeyboardButton("💬 Задать вопрос"),
         KeyboardButton("🆘 Правила клуба")
     )
     kb.add(
@@ -217,7 +216,7 @@ async def check_followup():
             "Я передам ваш отзыв тренеру, и он ответит вам в этом чате.\n\n"
             "А если понравилось – у нас действует <b>пробная неделя за 15€</b>.",
             reply_markup=InlineKeyboardMarkup().add(
-                InlineKeyboardButton("🌟 Попробовать пробную неделю", callback_data="sub_trial")
+                InlineKeyboardButton("Начать пробную неделю", callback_data="sub_trial")
             ),
             parse_mode="HTML"
         )
@@ -228,12 +227,7 @@ async def check_followup():
         cur.close()
         conn.close()
 
-# Кнопка "Меню" – показывает главное меню (оно же)
-@dp.message_handler(text="Меню")
-async def menu_button_handler(message: types.Message):
-    await show_menu(message)
-
-# Кнопка "💬 Сообщение админу" – пересылает сообщение админу
+# Кнопка "💬 Задать вопрос" – пересылает сообщение админу
 @dp.message_handler(text="💬 Сообщение админу")
 async def contact_admin(message: types.Message):
     await message.answer(
@@ -257,18 +251,13 @@ async def rules_button_handler(message: types.Message):
 2. Без спама и рекламы.
 3. Тренируйтесь в удовольствие!
 
-Полные правила можно найти в /rules"""
+"""
     await message.answer(rules_text, parse_mode="HTML")
 
 @dp.message_handler(content_types=['video'], state=None)
 async def reply_with_video_id(message: types.Message):
     file_id = message.video.file_id
     await message.reply(f"Ваш video file_id:\n{file_id}")
-    
-@dp.message_handler(commands=['menu'], state='*')
-async def show_menu(message: types.Message):
-    kb = get_main_keyboard()
-    await message.answer("🌟 <b>Главное меню</b>\n\nВыберите действие:", reply_markup=kb, parse_mode="HTML")
 
 @dp.callback_query_handler(text="confirm_promo", state=PromoStates.waiting_for_text)
 async def promo_send(callback: types.CallbackQuery, state: FSMContext):
