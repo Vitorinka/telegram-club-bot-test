@@ -158,9 +158,11 @@ def get_main_keyboard():
         KeyboardButton("🏠 В главное меню")
     )
     return kb
-
-# Использование:
-await message.answer("Выберите действие:", reply_markup=get_main_keyboard())
+    
+@dp.message_handler(commands=['menu'], state='*')
+async def show_menu(message: types.Message):
+    kb = get_main_keyboard()
+    await message.answer("🌟 <b>Главное меню</b>\n\nВыберите действие:", reply_markup=kb, parse_mode="HTML")
 
 @dp.callback_query_handler(text="confirm_promo", state=PromoStates.waiting_for_text)
 async def promo_send(callback: types.CallbackQuery, state: FSMContext):
