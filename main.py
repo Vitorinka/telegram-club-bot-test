@@ -204,6 +204,7 @@ async def free_lesson(message: types.Message):
 @dp.message_handler(text="🎁 Бесплатный урок")
 async def free_lesson_button(message: types.Message):
     # Просто вызываем существующую команду /free_lesson
+    await state.finish()
     await free_lesson(message)
 
 async def check_followup():
@@ -243,6 +244,7 @@ async def contact_admin(message: types.Message):
     # Клавиатура с кнопкой "Отмена"
     kb = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     kb.add(KeyboardButton("❌ Отмена"))
+    await state.finish()
     await message.answer(
         "📝 Напишите ваше сообщение администратору ниже.\n\n"
         "Или нажмите «Отмена», чтобы выйти.",
@@ -253,11 +255,13 @@ async def contact_admin(message: types.Message):
 # Кнопка "👤 Профиль и подписка" – вызывает команду /profile
 @dp.message_handler(text="👤 Профиль и подписка")
 async def profile_button_handler(message: types.Message):
+    await state.finish()
     await profile(message)
 
 # Кнопка "🆘 Правила клуба" – показывает правила (как в show_rules)
 @dp.message_handler(text="🆘 Правила клуба")
 async def rules_button_handler(message: types.Message):
+    await state.finish()
     rules_text = """📜 <b>Правила клуба</b>
 
 1. Уважайте других участников.
