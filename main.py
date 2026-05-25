@@ -164,6 +164,11 @@ def get_main_keyboard():
     )
     return kb
 
+@dp.message_handler(commands=['menu'], state='*')
+async def show_menu(message: types.Message):
+    kb = get_main_keyboard()
+    await message.answer("🌟 <b>Главное меню</b>\n\nВыберите действие:", reply_markup=kb, parse_mode="HTML")
+    
 @dp.message_handler(commands=['free_lesson'], state='*')
 async def free_lesson(message: types.Message):
     user_id = message.from_user.id
@@ -244,18 +249,6 @@ async def contact_admin(message: types.Message):
         reply_markup=kb
     )
     await ContactState.waiting_for_message.set()
-
-@dp.message_handler(state=ContactState.waiting_for_message, content_types=types.ContentTypes.ANY)
-async def forward_to_admin(message: types.Message, state: FSMContext):
-    # Если пользователь нажал «Отмена»
-    if message.text == "❌ Отмена":
-        await state.finish()
-        await message.answer("🚫 Отправка отменена.", reply_markup=get_main_keyboard())
-        return
-
-    # ... остальной код пересылки ...
-    await message.answer("✅ Ваше сообщение отправлено администратору.", reply_markup=get_main_keyboard())
-    await state.finish()
 
 # Кнопка "👤 Профиль и подписка" – вызывает команду /profile
 @dp.message_handler(text="👤 Профиль и подписка")
@@ -579,6 +572,7 @@ async def show_choice(callback: types.CallbackQuery, state: FSMContext):
     kb = get_tariffs_keyboard(show_trial=show_trial)
     await bot.send_photo(callback.message.chat.id, PHOTO_URL_RULES, caption=text, reply_markup=kb, parse_mode="HTML")
     await callback.answer()
+    await show_menu(callback.message)
 
 @dp.callback_query_handler(lambda c: c.data.startswith('sub_'), state='*')
 async def process_payment(callback: types.CallbackQuery, state: FSMContext):
@@ -1051,11 +1045,17 @@ async def forward_user_message(message: types.Message):
     if message.text and message.text.startswith('/'):
         return
 
+    # Не пересылаем сообщения, если пользователь находится в режиме ожидания сообщения для админа
+    current_state = await dp.current_state(chat=message.chat.id, user=message.from_user.id).get_state()
+    if current_state == ContactState.waiting_for_message.state:
+        return
+
     # Пересылаем сообщение админам
     for admin_id in ADMIN_IDS:
         await bot.forward_message(admin_id, message.chat.id, message.message_id)
-        await bot.send_message(admin_id, 
+        await bot.send_message(admin_id,
             f"✍️ Ответить пользователю:\n/reply_{message.from_user.id} <текст>")
+
 
 @dp.message_handler(commands=['reply'], state='*')
 async def reply_to_user(message: types.Message):
@@ -1083,6 +1083,26 @@ async def reply_to_user(message: types.Message):
 
     await bot.send_message(user_id, f"✍️ <b>Ответ администратора:</b>\n\n{reply_text}", parse_mode="HTML")
     await message.reply(f"✅ Ответ отправлен пользователю {user_id}")
+
+
+@dp.message_handler(state=ContactState.waiting_for_message, content_types=types.ContentTypes.ANY)
+async def forward_to_admin(message: types.Message, state: FSMContext):
+    # Если пользователь нажал «Отмена»
+    if message.text == "❌ Отмена":
+        await state.finish()
+        await message.answer("🚫 Отправка отменена.", reply_markup=get_main_keyboard())
+        return
+
+    # Пересылаем сообщение админам
+    for admin_id in ADMIN_IDS:
+        await bot.forward_message(admin_id, message.chat.id, message.message_id)
+        await bot.send_message(
+            admin_id,
+            f"📬 Пользователь @{message.from_user.username or message.from_user.id} написал:\n"
+            f"Ответить: /reply_{message.from_user.id} <текст>"
+        )
+    await message.answer("✅ Ваше сообщение отправлено администратору.", reply_markup=get_main_keyboard())
+    await state.finish()
     
 # --- ЗАПУСК И ВЕБХУК TELEGRAM ---
 async def on_startup(app):
