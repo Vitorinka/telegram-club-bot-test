@@ -102,9 +102,11 @@ async def cancel_handler(message: types.Message, state: FSMContext):
     if current_state is None:
         await message.reply("Нет активного действия для отмены.")
         return
+    
+    # Сбрасываем любое состояние
     await state.finish()
     await message.reply("✅ Действие отменено. Можете начать заново.")
-
+    
 @dp.message_handler(content_types=['photo', 'video'], state=PromoStates.waiting_for_media)
 async def promo_get_media(message: types.Message, state: FSMContext):
     if message.photo:
@@ -143,15 +145,14 @@ def get_main_keyboard():
     kb = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     kb.add(
         KeyboardButton("Меню"),
-        KeyboardButton("💬 Сообщение админу")
+        KeyboardButton("🎁 Бесплатный урок")
     )
     kb.add(
-        KeyboardButton("🎁 Бесплатный урок"),
+        KeyboardButton("💬 Сообщение админу"),
         KeyboardButton("🆘 Правила клуба")
     )
     kb.add(
         KeyboardButton("👤 Профиль и подписка"),
-        KeyboardButton("🆘 Правила клуба")
     )
     return kb
 
