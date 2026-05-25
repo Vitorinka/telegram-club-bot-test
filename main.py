@@ -147,6 +147,10 @@ def get_main_keyboard():
         KeyboardButton("💬 Сообщение админу")
     )
     kb.add(
+        KeyboardButton("🎁 Бесплатный урок"),
+        KeyboardButton("🆘 Правила клуба")
+    )
+    kb.add(
         KeyboardButton("👤 Профиль и подписка"),
         KeyboardButton("🆘 Правила клуба")
     )
@@ -183,6 +187,11 @@ async def free_lesson(message: types.Message):
     conn.close()
 
     await message.answer("✅ Урок отправлен!")
+
+@dp.message_handler(text="🎁 Бесплатный урок")
+async def free_lesson_button(message: types.Message):
+    # Просто вызываем существующую команду /free_lesson
+    await free_lesson(message)
 
 async def check_followup():
     logging.info("--- Запуск проверки отзывов на бесплатный урок ---")
