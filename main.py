@@ -109,6 +109,12 @@ async def cancel_handler(message: types.Message, state: FSMContext):
     # Сбрасываем любое состояние
     await state.finish()
     await message.reply("✅ Действие отменено. Можете начать заново.")
+
+from aiogram.types import ReplyKeyboardRemove
+
+@dp.message_handler(commands=['hide'])
+async def hide_keyboard(message: types.Message):
+    await message.answer("Клавиатура скрыта.", reply_markup=ReplyKeyboardRemove())
     
 @dp.message_handler(content_types=['photo', 'video'], state=PromoStates.waiting_for_media)
 async def promo_get_media(message: types.Message, state: FSMContext):
