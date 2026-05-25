@@ -137,6 +137,31 @@ async def promo_get_text(message: types.Message, state: FSMContext):
     else:
         await message.reply_video(file_id, caption=text + "\n\n---\n<i>Предпросмотр. Отправляем?</i>", reply_markup=kb, parse_mode="HTML")
 
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+
+def get_main_keyboard():
+    kb = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    kb.add(
+        KeyboardButton("🍽️ Меню"),
+        KeyboardButton("💬 Сообщение")
+    )
+    kb.add(
+        KeyboardButton("👤 Профиль"),
+        KeyboardButton("🆘 SOS Служба поддержки")
+    )
+    kb.add(
+        KeyboardButton("🌐 Язык интерфейса"),
+        KeyboardButton("📚 База знаний")
+    )
+    kb.add(
+        KeyboardButton("🔒 Конфиденциальность"),
+        KeyboardButton("🏠 В главное меню")
+    )
+    return kb
+
+# Использование:
+await message.answer("Выберите действие:", reply_markup=get_main_keyboard())
+
 @dp.callback_query_handler(text="confirm_promo", state=PromoStates.waiting_for_text)
 async def promo_send(callback: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
