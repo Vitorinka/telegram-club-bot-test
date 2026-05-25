@@ -35,6 +35,7 @@ bot = Bot(token=BOT_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 scheduler = AsyncIOScheduler()
+scheduler.add_job(check_followup, 'cron', hour=12, minute=0)  # каждый день в 12:00
 
 # --- СОСТОЯНИЯ FSM ---
 class RegistrationStates(StatesGroup):
@@ -150,6 +151,70 @@ def get_main_keyboard():
         KeyboardButton("🆘 Правила клуба")
     )
     return kb
+
+@dp.message_handler(commands=['free_lesson'], state='*')
+async def free_lesson(message: types.Message):
+    user_id = message.from_user.id
+
+    conn = get_db_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT free_lesson_sent FROM users WHERE telegram_id = %s", (user_id,))
+    row = cur.fetchone()
+    sent = row[0] if row else False
+
+    if sent:
+        await message.answer("❌ Вы уже получали бесплатный урок.")
+        cur.close()
+        conn.close()
+        return
+
+    # Вставьте сюда ваш VIDEO_FILE_ID (получите через /start и отправку видео)
+    VIDEO_FREE_LESSON = "BAACAgIAAxkBAAPSahQr16KLxtDqFbqXnIH_zdI0IeMAAsmiAAJ326lIpX7yBQ88ReY7BA"
+    
+    await bot.send_video(message.chat.id, VIDEO_FREE_LESSON, caption="🎬 Ваш бесплатный урок. Приятного просмотра!")
+
+    cur.execute("""
+        UPDATE users 
+        SET free_lesson_sent = TRUE, free_lesson_date = NOW() 
+        WHERE telegram_id = %s
+    """, (user_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    await message.answer("✅ Урок отправлен!")
+
+async def check_followup():
+    logging.info("--- Запуск проверки отзывов на бесплатный урок ---")
+    conn = get_db_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT telegram_id FROM users 
+        WHERE free_lesson_sent = TRUE 
+        AND followup_sent = FALSE 
+        AND free_lesson_date <= NOW() - INTERVAL '2 days'
+    """)
+    users = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    for (user_id,) in users:
+        await bot.send_message(user_id, 
+            "💬 <b>Как вам тренировка?</b>\n\n"
+            "Поделитесь впечатлениями или задайте вопрос. "
+            "Я передам ваш отзыв тренеру, и он ответит вам в этом чате.\n\n"
+            "А если понравилось – у нас действует <b>пробная неделя за 15€</b>.",
+            reply_markup=InlineKeyboardMarkup().add(
+                InlineKeyboardButton("🌟 Попробовать пробную неделю", callback_data="sub_trial")
+            ),
+            parse_mode="HTML"
+        )
+        conn = get_db_conn()
+        cur = conn.cursor()
+        cur.execute("UPDATE users SET followup_sent = TRUE WHERE telegram_id = %s", (user_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
 
 @dp.message_handler(content_types=['video'], state=None)
 async def reply_with_video_id(message: types.Message):
@@ -909,6 +974,49 @@ async def test_backup(message: types.Message):
     await message.answer("🔄 Запускаю бэкап...")
     await send_db_backup()
     await message.answer("✅ Бэкап завершён. Проверьте личные сообщения от бота (файл должен прийти админам).")
+
+@dp.message_handler(state='*')
+async def forward_user_message(message: types.Message):
+    # Не обрабатываем сообщения от админов
+    if message.from_user.id in ADMIN_IDS:
+        return
+    
+    # Игнорируем команды (чтобы не пересылать /start, /menu и т.д.)
+    if message.text and message.text.startswith('/'):
+        return
+
+    # Пересылаем сообщение админам
+    for admin_id in ADMIN_IDS:
+        await bot.forward_message(admin_id, message.chat.id, message.message_id)
+        await bot.send_message(admin_id, 
+            f"✍️ Ответить пользователю:\n/reply_{message.from_user.id} <текст>")
+
+@dp.message_handler(commands=['reply'], state='*')
+async def reply_to_user(message: types.Message):
+    if message.from_user.id not in ADMIN_IDS:
+        return
+
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2:
+        await message.reply("⚠️ Использование: /reply_<user_id> <текст>\nПример: /reply_123456789 Привет!")
+        return
+
+    # Извлекаем user_id из команды
+    cmd_parts = parts[0].split('_')
+    if len(cmd_parts) < 2:
+        await message.reply("⚠️ Неверный формат. Используйте: /reply_<user_id> <текст>")
+        return
+
+    try:
+        user_id = int(cmd_parts[1])
+    except ValueError:
+        await message.reply("⚠️ Неверный ID пользователя.")
+        return
+
+    reply_text = parts[1]
+
+    await bot.send_message(user_id, f"✍️ <b>Ответ администратора:</b>\n\n{reply_text}", parse_mode="HTML")
+    await message.reply(f"✅ Ответ отправлен пользователю {user_id}")
     
 # --- ЗАПУСК И ВЕБХУК TELEGRAM ---
 async def on_startup(app):
