@@ -1094,6 +1094,32 @@ async def forward_to_admin(message: types.Message, state: FSMContext):
     await message.answer("✅ Ваше сообщение отправлено администратору.", reply_markup=ReplyKeyboardRemove())
     await message.answer("🌟 Главное меню", reply_markup=get_main_keyboard())
     await state.finish()
+
+@dp.message_handler(state='*')
+async def forward_user_message(message: types.Message):
+    # Не обрабатываем сообщения от админов
+    if message.from_user.id in ADMIN_IDS:
+        return
+    
+    # Игнорируем команды (чтобы не пересылать /start, /menu и т.д.)
+    if message.text and message.text.startswith('/'):
+        return
+
+    # Игнорируем сообщения, которые являются кнопками главного меню
+    menu_buttons = ["🎁 Бесплатный урок", "💬 Задать вопрос", "🆘 Правила клуба", "👤 Профиль и подписка"]
+    if message.text in menu_buttons:
+        return
+
+    # Не пересылаем сообщения, если пользователь находится в режиме ожидания сообщения для админа
+    current_state = await dp.current_state(chat=message.chat.id, user=message.from_user.id).get_state()
+    if current_state == ContactState.waiting_for_message.state:
+        return
+
+    # Пересылаем сообщение админам
+    for admin_id in ADMIN_IDS:
+        await bot.forward_message(admin_id, message.chat.id, message.message_id)
+        await bot.send_message(admin_id,
+            f"✍️ Ответить пользователю:\n/reply_{message.from_user.id} <текст>")
     
 # --- ЗАПУСК И ВЕБХУК TELEGRAM ---
 async def on_startup(app):
