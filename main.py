@@ -17,6 +17,9 @@ class PromoStates(StatesGroup):
     waiting_for_media = State()   # ждём фото или видео
     waiting_for_text = State()    # ждём текст (можно объединить, но так проще)
 
+class ContactState(StatesGroup):
+    waiting_for_message = State()
+
 # --- НАСТРОЙКИ ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logging.info("Начинаю подключение к базе данных...")
