@@ -233,15 +233,29 @@ async def check_followup():
         cur.close()
         conn.close()
 
-# Кнопка "💬 Задать вопрос" – пересылает сообщение админу
-@dp.message_handler(text="💬 Сообщение админу")
+@dp.message_handler(text="💬 Задать вопрос")
 async def contact_admin(message: types.Message):
+    # Клавиатура с кнопкой "Отмена"
+    kb = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
+    kb.add(KeyboardButton("❌ Отмена"))
     await message.answer(
         "📝 Напишите ваше сообщение администратору ниже.\n\n"
-        "Мы ответим вам в ближайшее время."
+        "Или нажмите «Отмена», чтобы выйти.",
+        reply_markup=kb
     )
-    # Включаем режим ожидания сообщения от пользователя
     await ContactState.waiting_for_message.set()
+
+@dp.message_handler(state=ContactState.waiting_for_message, content_types=types.ContentTypes.ANY)
+async def forward_to_admin(message: types.Message, state: FSMContext):
+    # Если пользователь нажал «Отмена»
+    if message.text == "❌ Отмена":
+        await state.finish()
+        await message.answer("🚫 Отправка отменена.", reply_markup=get_main_keyboard())
+        return
+
+    # ... остальной код пересылки ...
+    await message.answer("✅ Ваше сообщение отправлено администратору.", reply_markup=get_main_keyboard())
+    await state.finish()
 
 # Кнопка "👤 Профиль и подписка" – вызывает команду /profile
 @dp.message_handler(text="👤 Профиль и подписка")
