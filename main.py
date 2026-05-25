@@ -201,9 +201,8 @@ async def free_lesson(message: types.Message):
 
     await message.answer("✅ Урок отправлен!")
 
-@dp.message_handler(text="🎁 Бесплатный урок")
-async def free_lesson_button(message: types.Message):
-    # Просто вызываем существующую команду /free_lesson
+@dp.message_handler(text="🎁 Бесплатный урок", state='*')
+async def free_lesson_button(message: types.Message, state: FSMContext):
     await state.finish()
     await free_lesson(message)
 
@@ -239,12 +238,11 @@ async def check_followup():
         cur.close()
         conn.close()
 
-@dp.message_handler(text="💬 Задать вопрос")
-async def contact_admin(message: types.Message):
-    # Клавиатура с кнопкой "Отмена"
+@dp.message_handler(text="💬 Задать вопрос", state='*')
+async def contact_admin(message: types.Message, state: FSMContext):
+    await state.finish()
     kb = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     kb.add(KeyboardButton("❌ Отмена"))
-    await state.finish()
     await message.answer(
         "📝 Напишите ваше сообщение администратору ниже.\n\n"
         "Или нажмите «Отмена», чтобы выйти.",
@@ -253,14 +251,14 @@ async def contact_admin(message: types.Message):
     await ContactState.waiting_for_message.set()
 
 # Кнопка "👤 Профиль и подписка" – вызывает команду /profile
-@dp.message_handler(text="👤 Профиль и подписка")
-async def profile_button_handler(message: types.Message):
+@dp.message_handler(text="👤 Профиль и подписка", state='*')
+async def profile_button_handler(message: types.Message, state: FSMContext):
     await state.finish()
     await profile(message)
 
 # Кнопка "🆘 Правила клуба" – показывает правила (как в show_rules)
-@dp.message_handler(text="🆘 Правила клуба")
-async def rules_button_handler(message: types.Message):
+@dp.message_handler(text="🆘 Правила клуба", state='*')
+async def rules_button_handler(message: types.Message, state: FSMContext):
     await state.finish()
     rules_text = """📜 <b>Правила клуба</b>
 
@@ -270,7 +268,7 @@ async def rules_button_handler(message: types.Message):
 
 """
     await message.answer(rules_text, parse_mode="HTML")
-
+    
 @dp.message_handler(content_types=['video'], state=None)
 async def reply_with_video_id(message: types.Message):
     file_id = message.video.file_id
