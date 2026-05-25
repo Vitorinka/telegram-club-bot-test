@@ -785,10 +785,6 @@ async def give_access_command(message: types.Message):
         cur.close()
         conn.close()
 
-@dp.message_handler(commands=['help'], state='*')
-async def help_command(message: types.Message):
-    await message.answer("По всем вопросам @re_tasha")
-
 @dp.message_handler(commands=['test_expiry'])
 async def test_expiry(message: types.Message):
     if message.from_user.id in ADMIN_IDS:
@@ -1021,28 +1017,6 @@ async def test_backup(message: types.Message):
     await message.answer("🔄 Запускаю бэкап...")
     await send_db_backup()
     await message.answer("✅ Бэкап завершён. Проверьте личные сообщения от бота (файл должен прийти админам).")
-
-@dp.message_handler(state='*')
-async def forward_user_message(message: types.Message):
-    # Не обрабатываем сообщения от админов
-    if message.from_user.id in ADMIN_IDS:
-        return
-    
-    # Игнорируем команды (чтобы не пересылать /start, /menu и т.д.)
-    if message.text and message.text.startswith('/'):
-        return
-
-    # Не пересылаем сообщения, если пользователь находится в режиме ожидания сообщения для админа
-    current_state = await dp.current_state(chat=message.chat.id, user=message.from_user.id).get_state()
-    if current_state == ContactState.waiting_for_message.state:
-        return
-
-    # Пересылаем сообщение админам
-    for admin_id in ADMIN_IDS:
-        await bot.forward_message(admin_id, message.chat.id, message.message_id)
-        await bot.send_message(admin_id,
-            f"✍️ Ответить пользователю:\n/reply_{message.from_user.id} <текст>")
-
 
 @dp.message_handler(commands=['reply'], state='*')
 async def reply_to_user(message: types.Message):
