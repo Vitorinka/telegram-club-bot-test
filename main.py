@@ -142,20 +142,12 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 def get_main_keyboard():
     kb = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     kb.add(
-        KeyboardButton("🍽️ Меню"),
-        KeyboardButton("💬 Сообщение")
+        KeyboardButton("Меню"),
+        KeyboardButton("💬 Сообщение админу")
     )
     kb.add(
-        KeyboardButton("👤 Профиль"),
-        KeyboardButton("🆘 SOS Служба поддержки")
-    )
-    kb.add(
-        KeyboardButton("🌐 Язык интерфейса"),
-        KeyboardButton("📚 База знаний")
-    )
-    kb.add(
-        KeyboardButton("🔒 Конфиденциальность"),
-        KeyboardButton("🏠 В главное меню")
+        KeyboardButton("👤 Профиль и подписка"),
+        KeyboardButton("🆘 Правила клуба")
     )
     return kb
     
