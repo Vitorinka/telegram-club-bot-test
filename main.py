@@ -1071,13 +1071,15 @@ async def reply_to_user(message: types.Message):
     await bot.send_message(user_id, f"✍️ <b>Ответ администратора:</b>\n\n{reply_text}", parse_mode="HTML")
     await message.reply(f"✅ Ответ отправлен пользователю {user_id}")
 
-
 @dp.message_handler(state=ContactState.waiting_for_message, content_types=types.ContentTypes.ANY)
 async def forward_to_admin(message: types.Message, state: FSMContext):
     # Если пользователь нажал «Отмена»
     if message.text == "❌ Отмена":
         await state.finish()
-        await message.answer("🚫 Отправка отменена.", reply_markup=get_main_keyboard())
+        # Сначала удаляем клавиатуру с кнопкой "Отмена"
+        await message.answer("🚫 Отправка отменена.", reply_markup=ReplyKeyboardRemove())
+        # Затем показываем главное меню
+        await message.answer("🌟 Главное меню", reply_markup=get_main_keyboard())
         return
 
     # Пересылаем сообщение админам
@@ -1088,7 +1090,9 @@ async def forward_to_admin(message: types.Message, state: FSMContext):
             f"📬 Пользователь @{message.from_user.username or message.from_user.id} написал:\n"
             f"Ответить: /reply_{message.from_user.id} <текст>"
         )
-    await message.answer("✅ Ваше сообщение отправлено администратору.", reply_markup=get_main_keyboard())
+    # После отправки сообщения админу – удаляем клавиатуру и показываем главное меню
+    await message.answer("✅ Ваше сообщение отправлено администратору.", reply_markup=ReplyKeyboardRemove())
+    await message.answer("🌟 Главное меню", reply_markup=get_main_keyboard())
     await state.finish()
     
 # --- ЗАПУСК И ВЕБХУК TELEGRAM ---
