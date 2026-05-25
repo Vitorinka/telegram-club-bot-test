@@ -150,6 +150,11 @@ def get_main_keyboard():
         KeyboardButton("🆘 Правила клуба")
     )
     return kb
+
+@dp.message_handler(content_types=['video'], state=None)
+async def reply_with_video_id(message: types.Message):
+    file_id = message.video.file_id
+    await message.reply(f"Ваш video file_id:\n{file_id}")
     
 @dp.message_handler(commands=['menu'], state='*')
 async def show_menu(message: types.Message):
