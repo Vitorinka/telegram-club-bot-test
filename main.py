@@ -458,19 +458,6 @@ async def send_db_backup():
         if os.path.exists(filename):
             os.remove(filename)
 
-@dp.message_handler(state=ContactState.waiting_for_message, content_types=types.ContentTypes.ANY)
-async def forward_to_admin(message: types.Message, state: FSMContext):
-    # Отправляем сообщение админу
-    for admin_id in ADMIN_IDS:
-        await bot.forward_message(admin_id, message.chat.id, message.message_id)
-        await bot.send_message(
-            admin_id,
-            f"📬 Пользователь @{message.from_user.username or message.from_user.id} написал:\n"
-            f"Ответить: /reply_{message.from_user.id} <текст>"
-        )
-    await message.answer("✅ Ваше сообщение отправлено администратору. Мы ответим вам в ближайшее время.")
-    await state.finish()
-
 # --- ХЕНДЛЕРЫ КОМАНД И КОЛБЭКОВ ---
 @dp.message_handler(commands=['start'], state='*')
 async def start(message: types.Message, state: FSMContext):
