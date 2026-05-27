@@ -169,74 +169,133 @@ async def show_menu(message: types.Message):
     kb = get_main_keyboard()
     await message.answer("🌟 <b>Главное меню</b>\n\nВыберите действие:", reply_markup=kb, parse_mode="HTML")
     
-@dp.message_handler(commands=['free_lesson'], state='*')
-async def free_lesson(message: types.Message):
+@dp.message_handler(text="🎁 Бесплатный урок", state='*')
+async def free_lesson_button(message: types.Message, state: FSMContext):
+    await state.finish()
     user_id = message.from_user.id
 
     conn = get_db_conn()
     cur = conn.cursor()
-    cur.execute("SELECT free_lesson_sent FROM users WHERE telegram_id = %s", (user_id,))
+    # Проверяем, не отправляли ли уже видео
+    cur.execute("SELECT video_sent FROM users WHERE telegram_id = %s", (user_id,))
     row = cur.fetchone()
-    sent = row[0] if row else False
-
-    if sent:
+    if row and row[0]:
         await message.answer("❌ Вы уже получали бесплатный урок.")
         cur.close()
         conn.close()
         return
 
-    # Вставьте сюда ваш VIDEO_FILE_ID (получите через /start и отправку видео)
     VIDEO_FREE_LESSON = "BAACAgIAAxkBAAPSahQr16KLxtDqFbqXnIH_zdI0IeMAAsmiAAJ326lIpX7yBQ88ReY7BA"
-    
     await bot.send_video(message.chat.id, VIDEO_FREE_LESSON, caption="🎬 Ваш бесплатный урок. Приятного просмотра!")
 
+    # Отмечаем, что видео отправлено, и ставим время отправки
     cur.execute("""
         UPDATE users 
-        SET free_lesson_sent = TRUE, free_lesson_date = NOW() 
+        SET video_sent = TRUE, video_sent_at = NOW() 
         WHERE telegram_id = %s
     """, (user_id,))
     conn.commit()
     cur.close()
     conn.close()
 
-    await message.answer("✅ Урок отправлен!")
-
-@dp.message_handler(text="🎁 Бесплатный урок", state='*')
-async def free_lesson_button(message: types.Message, state: FSMContext):
-    await state.finish()
-    await free_lesson(message)
+    await message.answer("Приятного просмотра!")
 
 async def check_followup():
-    logging.info("--- Запуск проверки отзывов на бесплатный урок ---")
+    logging.info("--- Запуск проверки автоматических уроков и отзывов ---")
     conn = get_db_conn()
     cur = conn.cursor()
+    now = datetime.utcnow()
+
+    VIDEO_ID = "BAACAgIAAxkBAAPSahQr16KLxtDqFbqXnIH_zdI0IeMAAsmiAAJ326lIpX7yBQ88ReY7BA"
+
+    # ---------- 1. Отправка видео-урока (всем, кто зарегистрировался 2 дня назад) ----------
+    cur.execute("""
+        SELECT telegram_id, paid, trial_used FROM users 
+        WHERE registered_at IS NOT NULL 
+        AND video_sent = FALSE 
+        AND registered_at <= NOW() - INTERVAL '2 days'
+    """)
+    users_for_video = cur.fetchall()
+    for (user_id, paid, trial_used) in users_for_video:
+        # Отправляем видео (всем без исключения)
+        await bot.send_video(user_id, VIDEO_ID, caption="🎬 Ваш бесплатный урок. Приятного просмотра!")
+        cur.execute("UPDATE users SET video_sent = TRUE, video_sent_at = NOW() WHERE telegram_id = %s", (user_id,))
+        conn.commit()
+
+    # ---------- 2. Для НЕактивных (нет подписки и не использовал триал) ----------
     cur.execute("""
         SELECT telegram_id FROM users 
-        WHERE free_lesson_sent = TRUE 
-        AND followup_sent = FALSE 
-        AND free_lesson_date <= NOW() - INTERVAL '2 days'
+        WHERE video_sent = TRUE 
+        AND feedback_sent = FALSE 
+        AND video_sent_at <= NOW() - INTERVAL '2 days'
+        AND paid = FALSE 
+        AND trial_used = FALSE
     """)
-    users = cur.fetchall()
-    cur.close()
-    conn.close()
-
-    for (user_id,) in users:
-        await bot.send_message(user_id, 
+    users_for_feedback = cur.fetchall()
+    for (user_id,) in users_for_feedback:
+        await bot.send_message(user_id,
             "💬 <b>Как вам тренировка?</b>\n\n"
             "Поделитесь впечатлениями или задайте вопрос. "
             "Я передам ваш отзыв тренеру, и он ответит вам в этом чате.\n\n"
             "А если понравилось – у нас действует <b>пробная неделя за 15€</b>.",
             reply_markup=InlineKeyboardMarkup().add(
+                InlineKeyboardButton("🌟 Начать пробную неделю", callback_data="sub_trial")
+            ),
+            parse_mode="HTML"
+        )
+        cur.execute("UPDATE users SET feedback_sent = TRUE, feedback_sent_at = NOW() WHERE telegram_id = %s", (user_id,))
+        conn.commit()
+
+    # ---------- 3. Повторное предложение для неактивных, кто не ответил через 2 дня ----------
+    cur.execute("""
+        SELECT telegram_id FROM users 
+        WHERE feedback_sent = TRUE 
+        AND reminder_sent = FALSE 
+        AND feedback_received = FALSE 
+        AND paid = FALSE 
+        AND trial_used = FALSE
+        AND feedback_sent_at <= NOW() - INTERVAL '2 days'
+    """)
+    users_for_reminder = cur.fetchall()
+    for (user_id,) in users_for_reminder:
+        await bot.send_message(user_id,
+            "🌟 <b>Попробуйте пробную неделю за 15€</b>\n\n"
+            "Если вы ещё не решили – у вас есть возможность оценить клуб в течение 7 дней.",
+            reply_markup=InlineKeyboardMarkup().add(
                 InlineKeyboardButton("Начать пробную неделю", callback_data="sub_trial")
             ),
             parse_mode="HTML"
         )
-        conn = get_db_conn()
-        cur = conn.cursor()
-        cur.execute("UPDATE users SET followup_sent = TRUE WHERE telegram_id = %s", (user_id,))
+        cur.execute("UPDATE users SET reminder_sent = TRUE WHERE telegram_id = %s", (user_id,))
         conn.commit()
-        cur.close()
-        conn.close()
+
+    # ---------- 4. Для тех, кто использовал триал, но не оплатил (trial_used = TRUE, paid = FALSE) ----------
+    cur.execute("""
+        SELECT telegram_id FROM users 
+        WHERE video_sent = TRUE 
+        AND trial_used = TRUE 
+        AND paid = FALSE 
+        AND reminder_sent = FALSE   # используем reminder_sent как флаг, что предложение уже отправлено
+    """)
+    users_for_trial_used = cur.fetchall()
+    for (user_id,) in users_for_trial_used:
+        kb = get_tariffs_keyboard(show_trial=False)  # тарифы без пробного
+        await bot.send_message(user_id,
+            "📢 <b>Ещё больше тренировок ждут вас в клубе!</b>\n\n"
+            "Вы уже пробовали бесплатный урок. Оформите подписку, чтобы получить полный доступ к библиотеке, "
+            "живым эфирам и поддержке.\n\n"
+            "Выберите удобный тариф:",
+            reply_markup=kb,
+            parse_mode="HTML"
+        )
+        cur.execute("UPDATE users SET reminder_sent = TRUE WHERE telegram_id = %s", (user_id,))
+        conn.commit()
+
+    # ---------- 5. Для активных подписчиков (paid = TRUE) – только видео, без опросов и предложений ----------
+    # (видео уже отправилось на шаге 1, ничего дополнительно не делаем)
+
+    cur.close()
+    conn.close()
 
 @dp.message_handler(text="💬 Задать вопрос", state='*')
 async def contact_admin(message: types.Message, state: FSMContext):
@@ -559,6 +618,7 @@ async def show_choice(callback: types.CallbackQuery, state: FSMContext):
     cur.close()
     conn.close()
     kb = get_tariffs_keyboard(show_trial=show_trial)
+    cur.execute("UPDATE users SET registered_at = COALESCE(registered_at, NOW()) WHERE telegram_id = %s", (callback.from_user.id,))
     await bot.send_photo(callback.message.chat.id, PHOTO_URL_RULES, caption=text, reply_markup=kb, parse_mode="HTML")
     await callback.answer()
     await show_menu(callback.message)
@@ -1073,6 +1133,15 @@ async def forward_to_admin(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state='*')
 async def forward_user_message(message: types.Message):
+    # Если пользователь написал любой текст (не команду, не кнопку меню), считаем это отзывом
+    if message.text and not message.text.startswith('/') and message.text not in menu_buttons:
+        conn = get_db_conn()
+        cur = conn.cursor()
+        cur.execute("UPDATE users SET feedback_received = TRUE WHERE telegram_id = %s", (message.from_user.id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        
     # Не обрабатываем сообщения от админов
     if message.from_user.id in ADMIN_IDS:
         return
