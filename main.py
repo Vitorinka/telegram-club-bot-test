@@ -176,7 +176,6 @@ async def free_lesson_button(message: types.Message, state: FSMContext):
 
     conn = get_db_conn()
     cur = conn.cursor()
-    # Проверяем, не отправляли ли уже видео
     cur.execute("SELECT video_sent FROM users WHERE telegram_id = %s", (user_id,))
     row = cur.fetchone()
     if row and row[0]:
@@ -186,39 +185,9 @@ async def free_lesson_button(message: types.Message, state: FSMContext):
         return
 
     VIDEO_FREE_LESSON = "BAACAgIAAxkBAAPSahQr16KLxtDqFbqXnIH_zdI0IeMAAsmiAAJ326lIpX7yBQ88ReY7BA"
-    await bot.send_video(message.chat.id, VIDEO_FREE_LESSON, caption="🎬 Ваш бесплатный урок. Приятного просмотра!")
-
-    # Отмечаем, что видео отправлено, и ставим время отправки
-    cur.execute("""
-        UPDATE users 
-        SET video_sent = TRUE, video_sent_at = NOW() 
-        WHERE telegram_id = %s
-    """, (user_id,))
-    conn.commit()
-    cur.close()
-    conn.close()
-
-    await message.answer("Приятного просмотра!")
-
-async def check_followup():
-    logging.info("--- Запуск проверки автоматических уроков и отзывов ---")
-    conn = get_db_conn()
-    cur = conn.cursor()
-    now = datetime.utcnow()
-
-    VIDEO_ID = "BAACAgIAAxkBAAPSahQr16KLxtDqFbqXnIH_zdI0IeMAAsmiAAJ326lIpX7yBQ88ReY7BA"
-
-    # ---------- 1. Отправка видео-урока (всем, кто зарегистрировался 2 дня назад) ----------
-    cur.execute("""
-        SELECT telegram_id, paid, trial_used FROM users 
-        WHERE registered_at IS NOT NULL 
-        AND video_sent = FALSE 
-        AND registered_at <= NOW() - INTERVAL '2 days'
-    """)
-    users_for_video = cur.fetchall()
-    for (user_id, paid, trial_used) in users_for_video:
-        # Отправляем видео (всем без исключения)
-        await bot.send_video(user_id, VIDEO_ID, caption= """
+    
+    # Длинный текст + кнопка
+    caption_text = """
 <b>Чтобы почувствовать изменения в теле и самочувствии, не нужно усложнять.</b>
 
 Для того чтобы уменьшить напряжение, скованность и дискомфорт в теле, не нужен зал, сложное оборудование и час свободного времени. Иногда достаточно коврика и 15 минут правильного движения.
@@ -238,7 +207,65 @@ async def check_followup():
 А если вам понравился такой подход, я подготовила <i>специальное предложение на пробную неделю в онлайн-клубе.</i>
 
 <b>Там вас ждут полноценные тренировки, короткие зарядки, медитации, рецепты и системная работа с телом.</b>
-""")
+"""
+    kb = InlineKeyboardMarkup().add(InlineKeyboardButton("🌟 Начать пробную неделю", callback_data="sub_trial"))
+    
+    await bot.send_video(message.chat.id, VIDEO_FREE_LESSON, caption=caption_text, reply_markup=kb, parse_mode="HTML")
+
+    cur.execute("""
+        UPDATE users 
+        SET video_sent = TRUE, video_sent_at = NOW() 
+        WHERE telegram_id = %s
+    """, (user_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    # Не отправляем дополнительное сообщение, так как текст уже в caption
+    # await message.answer("Приятного просмотра!")
+
+async def check_followup():
+    logging.info("--- Запуск проверки автоматических уроков и отзывов ---")
+    conn = get_db_conn()
+    cur = conn.cursor()
+    now = datetime.utcnow()
+
+    VIDEO_ID = "BAACAgIAAxkBAAPSahQr16KLxtDqFbqXnIH_zdI0IeMAAsmiAAJ326lIpX7yBQ88ReY7BA"
+
+        # ---------- 1. Отправка видео-урока (всем, кто зарегистрировался 2 дня назад) ----------
+    cur.execute("""
+        SELECT telegram_id, paid, trial_used FROM users 
+        WHERE registered_at IS NOT NULL 
+        AND video_sent = FALSE 
+        AND registered_at <= NOW() - INTERVAL '2 days'
+    """)
+    users_for_video = cur.fetchall()
+    for (user_id, paid, trial_used) in users_for_video:
+        # Длинный текст + кнопка
+        caption_text = """
+<b>Чтобы почувствовать изменения в теле и самочувствии, не нужно усложнять.</b>
+
+Для того чтобы уменьшить напряжение, скованность и дискомфорт в теле, не нужен зал, сложное оборудование и час свободного времени. Иногда достаточно коврика и 15 минут правильного движения.
+
+Именно поэтому я подготовила эту пробную тренировку на осанку – приятную, понятную и эффективную.
+
+<b>Она подойдёт, если вы:</b>
+- только начинаете тренироваться
+- устали от жёстких нагрузок
+- хотите чувствовать тело лучше без перегрузки
+
+<b>После тренировки вы почувствуете:</b>
+- больше лёгкости и подвижности
+- меньше напряжения в теле
+- ощущение, что тело наконец стало хорошо
+
+А если вам понравился такой подход, я подготовила <i>специальное предложение на пробную неделю в онлайн-клубе.</i>
+
+<b>Там вас ждут полноценные тренировки, короткие зарядки, медитации, рецепты и системная работа с телом.</b>
+"""
+        kb = InlineKeyboardMarkup().add(InlineKeyboardButton("🌟 Начать пробную неделю", callback_data="sub_trial"))
+        
+        await bot.send_video(user_id, VIDEO_ID, caption=caption_text, reply_markup=kb, parse_mode="HTML")
         cur.execute("UPDATE users SET video_sent = TRUE, video_sent_at = NOW() WHERE telegram_id = %s", (user_id,))
         conn.commit()
 
