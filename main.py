@@ -1180,6 +1180,9 @@ async def forward_to_admin(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state='*')
 async def forward_user_message(message: types.Message):
+    # Определяем список кнопок меню в самом начале
+    menu_buttons = ["🎁 Бесплатный урок", "💬 Задать вопрос", "🆘 Правила клуба", "👤 Профиль и подписка"]
+    
     # Если пользователь написал любой текст (не команду, не кнопку меню), считаем это отзывом
     if message.text and not message.text.startswith('/') and message.text not in menu_buttons:
         conn = get_db_conn()
@@ -1193,12 +1196,11 @@ async def forward_user_message(message: types.Message):
     if message.from_user.id in ADMIN_IDS:
         return
     
-    # Игнорируем команды (чтобы не пересылать /start, /menu и т.д.)
+    # Игнорируем команды
     if message.text and message.text.startswith('/'):
         return
 
-    # Игнорируем сообщения, которые являются кнопками главного меню
-    menu_buttons = ["🎁 Бесплатный урок", "💬 Задать вопрос", "🆘 Правила клуба", "👤 Профиль и подписка"]
+    # Игнорируем кнопки меню
     if message.text in menu_buttons:
         return
 
