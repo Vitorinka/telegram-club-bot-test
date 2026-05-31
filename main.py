@@ -397,20 +397,47 @@ async def admin_reply(message: types.Message, state: FSMContext):
         return
     
     # Отправляем сообщение пользователю
-    await bot.send_message(user_id, f"✍️ {message.html_text}", parse_mode="HTML")
+    await bot.send_message(user_id, f"✍️Ответ: {message.html_text}", parse_mode="HTML")
     # Подтверждение админу
     await message.reply(f"✅ Сообщение отправлено пользователю {user_id}")
     
     # Не завершаем режим – админ может продолжать отвечать этому же пользователю
 
-@dp.message_handler(commands=['end'], state='*')
-async def end_reply_mode(message: types.Message, state: FSMContext):
-    current_state = await state.get_state()
-    if current_state == ReplyState.waiting_for_reply.state:
-        await state.finish()
-        await message.reply("✅ Режим ответа завершён. Вы больше не отвечаете пользователю.")
-    else:
-        await message.reply("Вы не находитесь в режиме ответа.")
+@dp.callback_query_handler(lambda c: c.data.startswith('reply_to_'), state='*')
+async def start_reply_mode(callback: types.CallbackQuery, state: FSMContext):
+    user_id = int(callback.data.split('_')[2])
+    await state.update_data(reply_to_user=user_id)
+    await ReplyState.waiting_for_reply.set()
+    await callback.message.edit_text(
+        f"✉️ Вы отвечаете пользователю {user_id}\n"
+        f"Все ваши следующие сообщения будут отправлены ему.\n"
+        f"Для завершения режима ответа отправьте /end."
+    )
+    await callback.answer()
+
+@dp.callback_query_handler(lambda c: c.data.startswith('reply_to_'), state='*')
+async def start_reply_mode(callback: types.CallbackQuery, state: FSMContext):
+    user_id = int(callback.data.split('_')[2])
+    await state.update_data(reply_to_user=user_id)
+    await ReplyState.waiting_for_reply.set()
+    
+    # Кнопка "Завершить" (inline)
+    end_kb = InlineKeyboardMarkup().add(
+        InlineKeyboardButton("🔚 Завершить ответ", callback_data="end_reply")
+    )
+    await callback.message.edit_text(
+        f"✉️ Вы отвечаете пользователю {user_id}\n"
+        f"Все ваши следующие сообщения будут отправлены ему.\n"
+        f"Для завершения нажмите кнопку.",
+        reply_markup=end_kb
+    )
+    await callback.answer()
+
+@dp.callback_query_handler(text="end_reply", state=ReplyState.waiting_for_reply)
+async def end_reply_mode(callback: types.CallbackQuery, state: FSMContext):
+    await state.finish()
+    await callback.message.edit_text("✅ Режим ответа завершён.")
+    await callback.answer()
 
 # Кнопка "👤 Профиль и подписка" – вызывает команду /profile
 @dp.message_handler(text="👤 Профиль и подписка", state='*')
@@ -1236,41 +1263,39 @@ async def forward_to_admin(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state='*')
 async def forward_user_message(message: types.Message):
-    # Определяем список кнопок меню в самом начале
+    # Определяем список кнопок меню
     menu_buttons = ["🎁 Бесплатный урок", "💬 Задать вопрос", "🆘 Правила клуба", "👤 Профиль и подписка"]
-    
-    # Если пользователь написал любой текст (не команду, не кнопку меню), считаем это отзывом
-    if message.text and not message.text.startswith('/') and message.text not in menu_buttons:
-        conn = get_db_conn()
-        cur = conn.cursor()
-        cur.execute("UPDATE users SET feedback_received = TRUE WHERE telegram_id = %s", (message.from_user.id,))
-        conn.commit()
-        cur.close()
-        conn.close()
-        
-    # Не обрабатываем сообщения от админов
-    if message.from_user.id in ADMIN_IDS:
-        return
     
     # Игнорируем команды
     if message.text and message.text.startswith('/'):
         return
-
+    
+    # Игнорируем сообщения от админов
+    if message.from_user.id in ADMIN_IDS:
+        return
+    
     # Игнорируем кнопки меню
     if message.text in menu_buttons:
         return
-
-    # Не пересылаем сообщения, если пользователь находится в режиме ожидания сообщения для админа
+    
+    # Игнорируем, если пользователь в режиме "Задать вопрос"
     current_state = await dp.current_state(chat=message.chat.id, user=message.from_user.id).get_state()
     if current_state == ContactState.waiting_for_message.state:
         return
-
-    # Пересылаем сообщение админам
+    
+    # Пересылаем сообщение каждому админу
     for admin_id in ADMIN_IDS:
         await bot.forward_message(admin_id, message.chat.id, message.message_id)
-        await bot.send_message(admin_id,
-            f"✍️ Ответить пользователю:\n/reply_{message.from_user.id} <текст>")
-    
+        # Создаём inline-кнопку "Ответить"
+        kb = InlineKeyboardMarkup().add(
+            InlineKeyboardButton("✍️ Ответить", callback_data=f"reply_to_{message.from_user.id}")
+        )
+        await bot.send_message(
+            admin_id,
+            f"👤 Пользователь: @{message.from_user.username or message.from_user.id} (ID: {message.from_user.id})",
+            reply_markup=kb
+        )
+        
 # --- ЗАПУСК И ВЕБХУК TELEGRAM ---
 async def on_startup(app):
     init_db()
