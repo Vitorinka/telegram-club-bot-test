@@ -408,18 +408,6 @@ async def start_reply_mode(callback: types.CallbackQuery, state: FSMContext):
     user_id = int(callback.data.split('_')[2])
     await state.update_data(reply_to_user=user_id)
     await ReplyState.waiting_for_reply.set()
-    await callback.message.edit_text(
-        f"✉️ Вы отвечаете пользователю {user_id}\n"
-        f"Все ваши следующие сообщения будут отправлены ему.\n"
-        f"Для завершения режима ответа отправьте /end."
-    )
-    await callback.answer()
-
-@dp.callback_query_handler(lambda c: c.data.startswith('reply_to_'), state='*')
-async def start_reply_mode(callback: types.CallbackQuery, state: FSMContext):
-    user_id = int(callback.data.split('_')[2])
-    await state.update_data(reply_to_user=user_id)
-    await ReplyState.waiting_for_reply.set()
     
     # Кнопка "Завершить" (inline)
     end_kb = InlineKeyboardMarkup().add(
