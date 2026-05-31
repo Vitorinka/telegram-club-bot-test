@@ -88,6 +88,11 @@ def init_db():
     conn.close()
     logging.info("--- БД ИНИЦИАЛИЗИРОВАНА И ПРОВЕРЕНА ---")
 
+@dp.message_handler(commands=['menu'], state='*')
+async def show_menu(message: types.Message):
+    kb = get_main_keyboard()
+    await message.answer("🌟 <b>Главное меню</b>\n\nВыберите действие:", reply_markup=kb, parse_mode="HTML")
+
 @dp.message_handler(commands=['promo_trial'], state='*')
 async def promo_trial(message: types.Message, state: FSMContext):
     await state.finish()   # <--- сбросить любое зависшее состояние
@@ -163,11 +168,6 @@ def get_main_keyboard():
         KeyboardButton("👤 Профиль и подписка"),
     )
     return kb
-
-@dp.message_handler(commands=['menu'], state='*')
-async def show_menu(message: types.Message):
-    kb = get_main_keyboard()
-    await message.answer("🌟 <b>Главное меню</b>\n\nВыберите действие:", reply_markup=kb, parse_mode="HTML")
     
 @dp.message_handler(text="🎁 Бесплатный урок", state='*')
 async def free_lesson_button(message: types.Message, state: FSMContext):
