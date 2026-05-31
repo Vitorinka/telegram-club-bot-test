@@ -1231,41 +1231,6 @@ async def test_backup(message: types.Message):
     await message.answer("🔄 Запускаю бэкап...")
     await send_db_backup()
     await message.answer("✅ Бэкап завершён. Проверьте личные сообщения от бота (файл должен прийти админам).")
-
-@dp.message_handler(state='*')
-async def forward_user_message(message: types.Message):
-    # Определяем список кнопок меню
-    menu_buttons = ["🎁 Бесплатный урок", "💬 Задать вопрос", "🆘 Правила клуба", "👤 Профиль и подписка"]
-    
-    # Игнорируем команды
-    if message.text and message.text.startswith('/'):
-        return
-    
-    # Игнорируем сообщения от админов
-    if message.from_user.id in ADMIN_IDS:
-        return
-    
-    # Игнорируем кнопки меню
-    if message.text in menu_buttons:
-        return
-    
-    # Игнорируем, если пользователь в режиме "Задать вопрос"
-    current_state = await dp.current_state(chat=message.chat.id, user=message.from_user.id).get_state()
-    if current_state == ContactState.waiting_for_message.state:
-        return
-    
-    # Пересылаем сообщение каждому админу
-    for admin_id in ADMIN_IDS:
-        await bot.forward_message(admin_id, message.chat.id, message.message_id)
-        # Создаём inline-кнопку "Ответить"
-        kb = InlineKeyboardMarkup().add(
-            InlineKeyboardButton("✍️ Ответить", callback_data=f"reply_to_{message.from_user.id}")
-        )
-        await bot.send_message(
-            admin_id,
-            f"👤 Пользователь: @{message.from_user.username or message.from_user.id} (ID: {message.from_user.id})",
-            reply_markup=kb
-        )
         
 # --- ЗАПУСК И ВЕБХУК TELEGRAM ---
 async def on_startup(app):
