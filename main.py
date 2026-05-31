@@ -425,6 +425,28 @@ async def end_reply_mode(callback: types.CallbackQuery, state: FSMContext):
 # ---------- Обработка сообщений через кнопку "Задать вопрос" (уже есть выше, но остаётся) ----------
 # (остальной код: кнопки меню, profile, rules, payment и т.д. – без изменений)
 
+@dp.message_handler(state=ContactState.waiting_for_message, content_types=types.ContentTypes.ANY)
+async def forward_to_admin(message: types.Message, state: FSMContext):
+    # Если пользователь нажал «Отмена»
+    if message.text == "❌ Отмена":
+        await state.finish()
+        await message.answer("🚫 Отправка отменена.", reply_markup=ReplyKeyboardRemove())
+        await message.answer("🌟 Главное меню", reply_markup=get_main_keyboard())
+        return
+
+    # Пересылаем сообщение админам
+    for admin_id in ADMIN_IDS:
+        await bot.forward_message(admin_id, message.chat.id, message.message_id)
+        await bot.send_message(
+            admin_id,
+            f"📬 Пользователь @{message.from_user.username or message.from_user.id} написал:\n"
+            f"Ответьте, используя кнопку «Ответить» на его следующее сообщение (или через режим ответа)."
+        )
+    # После отправки – удаляем клавиатуру и показываем главное меню
+    await message.answer("✅ Ваше сообщение отправлено администратору.", reply_markup=ReplyKeyboardRemove())
+    await message.answer("🌟 Главное меню", reply_markup=get_main_keyboard())
+    await state.finish()
+
 # Кнопка "👤 Профиль и подписка" – вызывает команду /profile
 @dp.message_handler(text="👤 Профиль и подписка", state='*')
 async def profile_button_handler(message: types.Message, state: FSMContext):
