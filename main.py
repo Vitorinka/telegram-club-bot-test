@@ -19,6 +19,8 @@ class PromoStates(StatesGroup):
 
 class ContactState(StatesGroup):
     waiting_for_message = State()
+class ReplyState(StatesGroup):
+    waiting_for_reply = State()  # с каким user_id сейчас идёт диалог
 
 # --- НАСТРОЙКИ ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -355,6 +357,60 @@ async def contact_admin(message: types.Message, state: FSMContext):
         reply_markup=kb
     )
     await ContactState.waiting_for_message.set()
+
+@dp.message_handler(state='*')
+async def forward_user_message(message: types.Message):
+    # ... проверки (не админ, не команда, не кнопка меню, не состояние ожидания) ...
+    
+    # Пересылаем сообщение админу
+    for admin_id in ADMIN_IDS:
+        await bot.forward_message(admin_id, message.chat.id, message.message_id)
+        # Кнопка "Ответить" с callback_data, содержащим user_id
+        kb = InlineKeyboardMarkup().add(
+            InlineKeyboardButton("✍️ Ответить", callback_data=f"reply_to_{message.from_user.id}")
+        )
+        await bot.send_message(
+            admin_id,
+            f"👤 Пользователь: @{message.from_user.username or message.from_user.id}\n"
+            f"Чтобы ответить, нажмите кнопку ниже.",
+            reply_markup=kb
+        )
+
+@dp.callback_query_handler(lambda c: c.data.startswith('reply_to_'), state='*')
+async def start_reply_mode(callback: types.CallbackQuery, state: FSMContext):
+    user_id = int(callback.data.split('_')[2])
+    await state.update_data(reply_to_user=user_id)
+    await ReplyState.waiting_for_reply.set()
+    await callback.message.edit_text(
+        f"✉️ Вы отвечаете пользователю {user_id}\n"
+        f"Все ваши следующие сообщения будут отправлены ему.\n"
+        f"Для завершения режима ответа отправьте /end."
+    )
+    await callback.answer()
+
+@dp.message_handler(state=ReplyState.waiting_for_reply, content_types=types.ContentTypes.ANY)
+async def admin_reply(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    user_id = data.get('reply_to_user')
+    if not user_id:
+        await state.finish()
+        return
+    
+    # Отправляем сообщение пользователю
+    await bot.send_message(user_id, f"✍️ {message.html_text}", parse_mode="HTML")
+    # Подтверждение админу
+    await message.reply(f"✅ Сообщение отправлено пользователю {user_id}")
+    
+    # Не завершаем режим – админ может продолжать отвечать этому же пользователю
+
+@dp.message_handler(commands=['end'], state='*')
+async def end_reply_mode(message: types.Message, state: FSMContext):
+    current_state = await state.get_state()
+    if current_state == ReplyState.waiting_for_reply.state:
+        await state.finish()
+        await message.reply("✅ Режим ответа завершён. Вы больше не отвечаете пользователю.")
+    else:
+        await message.reply("Вы не находитесь в режиме ответа.")
 
 # Кнопка "👤 Профиль и подписка" – вызывает команду /profile
 @dp.message_handler(text="👤 Профиль и подписка", state='*')
