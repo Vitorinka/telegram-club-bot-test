@@ -188,11 +188,18 @@ async def free_lesson_button(message: types.Message, state: FSMContext):
     cur.execute("SELECT video_sent FROM users WHERE telegram_id = %s", (user_id,))
     row = cur.fetchone()
     if row and row[0]:
-        await message.answer("❌ Вы уже получали бесплатный урок.")
-        cur.close()
-        conn.close()
-        return
-
+    # Вместо просто "❌ Вы уже получали бесплатный урок."
+    kb = get_tariffs_keyboard(show_trial=True)  # показываем пробную неделю и платные тарифы
+    await message.answer(
+        "✅ Вы уже получали бесплатный урок.\n\n"
+        "Теперь вы можете оформить подписку и получить полный доступ к клубу:",
+        reply_markup=kb,
+        parse_mode="HTML"
+    )
+    cur.close()
+    conn.close()
+    return
+    
     VIDEO_FREE_LESSON = "BAACAgIAAxkBAAPSahQr16KLxtDqFbqXnIH_zdI0IeMAAsmiAAJ326lIpX7yBQ88ReY7BA"
     
     # Длинный текст + кнопка
