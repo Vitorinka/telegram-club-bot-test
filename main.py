@@ -1196,57 +1196,6 @@ async def test_backup(message: types.Message):
     await send_db_backup()
     await message.answer("✅ Бэкап завершён. Проверьте личные сообщения от бота (файл должен прийти админам).")
 
-@dp.message_handler(commands=['reply'], state='*')
-async def reply_to_user(message: types.Message):
-    if message.from_user.id not in ADMIN_IDS:
-        return
-
-    parts = message.text.split(maxsplit=1)
-    if len(parts) < 2:
-        await message.reply("⚠️ Использование: /reply_<user_id> <текст>\nПример: /reply_123456789 Привет!")
-        return
-
-    # Извлекаем user_id из команды
-    cmd_parts = parts[0].split('_')
-    if len(cmd_parts) < 2:
-        await message.reply("⚠️ Неверный формат. Используйте: /reply_<user_id> <текст>")
-        return
-
-    try:
-        user_id = int(cmd_parts[1])
-    except ValueError:
-        await message.reply("⚠️ Неверный ID пользователя.")
-        return
-
-    reply_text = parts[1]
-
-    await bot.send_message(user_id, f"✍️ <b>Ответ администратора:</b>\n\n{reply_text}", parse_mode="HTML")
-    await message.reply(f"✅ Ответ отправлен пользователю {user_id}")
-
-@dp.message_handler(state=ContactState.waiting_for_message, content_types=types.ContentTypes.ANY)
-async def forward_to_admin(message: types.Message, state: FSMContext):
-    # Если пользователь нажал «Отмена»
-    if message.text == "❌ Отмена":
-        await state.finish()
-        # Сначала удаляем клавиатуру с кнопкой "Отмена"
-        await message.answer("🚫 Отправка отменена.", reply_markup=ReplyKeyboardRemove())
-        # Затем показываем главное меню
-        await message.answer("🌟 Главное меню", reply_markup=get_main_keyboard())
-        return
-
-    # Пересылаем сообщение админам
-    for admin_id in ADMIN_IDS:
-        await bot.forward_message(admin_id, message.chat.id, message.message_id)
-        await bot.send_message(
-            admin_id,
-            f"📬 Пользователь @{message.from_user.username or message.from_user.id} написал:\n"
-            f"Ответить: /reply_{message.from_user.id} <текст>"
-        )
-    # После отправки сообщения админу – удаляем клавиатуру и показываем главное меню
-    await message.answer("✅ Ваше сообщение отправлено администратору.", reply_markup=ReplyKeyboardRemove())
-    await message.answer("🌟 Главное меню", reply_markup=get_main_keyboard())
-    await state.finish()
-
 @dp.message_handler(state='*')
 async def forward_user_message(message: types.Message):
     # Определяем список кнопок меню
