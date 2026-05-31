@@ -371,6 +371,7 @@ async def contact_admin(message: types.Message, state: FSMContext):
         reply_markup=kb
     )
     await ContactState.waiting_for_message.set()
+    await bot.send_message(user_id, "🌟 Главное меню", reply_markup=get_main_keyboard())
 
 # ---------- Пересылка сообщений от пользователей админу (с кнопкой "Ответить") ----------
 @dp.message_handler(state='*')
